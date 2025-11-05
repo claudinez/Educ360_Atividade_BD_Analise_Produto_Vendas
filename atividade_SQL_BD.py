@@ -22,8 +22,6 @@ SUPABASE_KEY = (
     or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxicW1hdHd6d213c3ZncG16bXJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMDc1NjgsImV4cCI6MjA3Nzc4MzU2OH0.uQdyvnb-S6GA8rkOtGOOgUldf04pqbWaPhtuRggQHKc"
 )
-if not os.getenv("SUPABASE_URL") or (not os.getenv("SUPABASE_ANON_KEY") and not os.getenv("SUPABASE_SERVICE_ROLE_KEY")):
-    st.warning("Usando URL/KEY embutidos. Recomendo configurar .env para segurança.")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ---- CONSULTA DADOS ----
