@@ -9,6 +9,7 @@ import pandas as pd
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 # ---- CONFIGURAÇÃO ----
 load_dotenv()
@@ -76,7 +77,7 @@ try:
     if {"quantidade", "preco_unitario"}.issubset(df.columns):
         df["valor_total"] = df["quantidade"] * df["preco_unitario"]
 
-    # Formata data_venda (DD/MM/YYYY) mantendo vazios como NaN
+    # Formatar data_venda (DD/MM/YYYY) mantendo vazios como NaN
     if "data_venda" in df.columns:
         try:
             df["data_venda"] = pd.to_datetime(df["data_venda"], errors="coerce")
@@ -232,6 +233,47 @@ try:
 except Exception as e:
     st.error(f"Erro ao montar tabela com nulos tratados: {e}")
 
+# ---- FILTROS ADICIONAIS ----
+st.sidebar.header('Filtros Adicionais')
+
+# Filtro por data
+if 'data_venda_dt' in df_nulos_display.columns and not df_nulos_display['data_venda_dt'].empty:
+    min_date = df_nulos_display['data_venda_dt'].min().date()
+    max_date = df_nulos_display['data_venda_dt'].max().date()
+
+    start_date = st.sidebar.date_input('Data Inicial', min_date, format="DD/MM/YYYY")
+    end_date = st.sidebar.date_input('Data Final', max_date, format="DD/MM/YYYY")
+
+    # Converter as datas selecionadas para datetime para comparação
+    start_date_dt = datetime.combine(start_date, datetime.min.time())
+    end_date_dt = datetime.combine(end_date, datetime.max.time())
+
+    df_filtered = df_nulos_display[
+        (df_nulos_display['data_venda_dt'] >= start_date_dt) &
+        (df_nulos_display['data_venda_dt'] <= end_date_dt)
+    ]
+else:
+    df_filtered = df_nulos_display.copy()
+
+# Filtro por categoria
+if 'categoria' in df_filtered.columns and not df_filtered['categoria'].empty:
+    unique_categories = df_filtered['categoria'].unique().tolist()
+    selected_categories = st.sidebar.multiselect('Filtrar por Categoria', unique_categories, unique_categories)
+    df_filtered = df_filtered[df_filtered['categoria'].isin(selected_categories)]
+
+# Atualizar df_source para os gráficos usarem o DataFrame filtrado
+df_source = df_filtered.copy()
+
+# Botão de exportar para CSV
+if not df_filtered.empty:
+    csv = df_filtered.to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button(
+        label="Exportar Dados Filtrados para CSV",
+        data=csv,
+        file_name="dados_filtrados.csv",
+        mime="text/csv",
+    )
+
 # ---- ANÁLISES E VISUALIZAÇÕES ----
 st.header("📈 Análises e Visualizações")
 
@@ -315,12 +357,13 @@ try:
                     peaks,
                     x='data_venda_dt', y='valor_total',
                     color='data_venda_dt',
+                    text='dia_pico',
                     color_discrete_sequence=px.colors.qualitative.Pastel,
                     title=f'Dias de Pico de Faturamento (Top {top_n})',
                     labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
                 )
-                # Mostrar o dia do pico como rótulo na barra
-                fig_peaks.update_traces(text=peaks.get('dia_pico', ''), textposition='outside',
+                # Ajustar posição e estilo dos rótulos
+                fig_peaks.update_traces(textposition='outside',
                                         marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
                 fig_peaks.update_layout(showlegend=False, template='plotly_white')
                 st.plotly_chart(fig_peaks, use_container_width=True)
@@ -376,3 +419,28 @@ try:
                 st.plotly_chart(fig_top_sales_pie, use_container_width=True)
 except Exception as e:
     st.error(f"Erro ao gerar análises e visualizações: {e}")
+
+    st.sidebar.header('Filtros Adicionais')
+
+    # Filtro por data
+    min_date = df_nulos_display['data_venda_dt'].min().date()
+    max_date = df_nulos_display['data_venda_dt'].max().date()
+
+    start_date = st.sidebar.date_input('Data Inicial', min_date)
+    end_date = st.sidebar.date_input('Data Final', max_date)
+
+    # Converter as datas selecionadas para datetime para comparação
+    start_date_dt = datetime.combine(start_date, datetime.min.time())
+    end_date_dt = datetime.combine(end_date, datetime.max.time())
+
+    df_filtered = df_nulos_display[
+        (df_nulos_display['data_venda_dt'] >= start_date_dt) &
+        (df_nulos_display['data_venda_dt'] <= end_date_dt)
+    ]
+
+    # Atualizar df_source para os gráficos usarem o DataFrame filtrado
+    df_source = df_filtered.copy()
+
+    st.dataframe(df_filtered, use_container_width=True)
+
+    st.plotly_chart(fig_cat_pie, use_container_width=True)
