@@ -293,7 +293,7 @@ try:
         if 'data_venda' in df_metrics.columns:
             df_metrics['data_venda_dt'] = pd.to_datetime(df_metrics['data_venda'], format='%d/%m/%Y', errors='coerce')
 
-        # 1) Faturamento por categoria e Faturamento médio por categoria 
+        # 1) Faturamento por categoria e Faturamento médio por categoria
         if 'categoria' in df_metrics.columns:
             cat_rev = (
                 df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
