@@ -283,7 +283,8 @@ chart_selection = st.sidebar.selectbox(
     (
         'Faturamento por Categoria',
         'Evolução Diária e Dias de Pico',
-        'Top 10 Produtos'
+        'Top 10 Produtos',
+        'Todos os Gráficos'
     )
 )
 
@@ -295,7 +296,7 @@ try:
         df_metrics['data_venda_dt'] = pd.to_datetime(df_metrics['data_venda'], format='%d/%m/%Y', errors='coerce')
 
     # 1) Faturamento por categoria e Faturamento médio por categoria
-    if chart_selection == 'Faturamento por Categoria':
+    if chart_selection == 'Faturamento por Categoria' or chart_selection == 'Todos os Gráficos':
         if 'categoria' in df_metrics.columns:
             cat_rev = (
                 df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
@@ -326,7 +327,7 @@ try:
                 st.plotly_chart(fig_cat_pie, use_container_width=True)
 
     # 2) Evolução diária (linha) e Dias de Pico (barras)
-    if chart_selection == 'Evolução Diária e Dias de Pico':
+    if chart_selection == 'Evolução Diária e Dias de Pico' or chart_selection == 'Todos os Gráficos':
         if 'data_venda_dt' in df_metrics.columns:
             daily_rev = (
                 df_metrics.dropna(subset=['data_venda_dt'])
@@ -372,7 +373,7 @@ try:
                 st.plotly_chart(fig_peaks, use_container_width=True)
 
     # 3) Top 10 Produtos Mais Lucrativos (barras) e Produtos com mais vendas (pizza)
-    if chart_selection == 'Top 10 Produtos':
+    if chart_selection == 'Top 10 Produtos' or chart_selection == 'Todos os Gráficos':
         if 'nome_produto' in df_metrics.columns:
             prod_profit = (
                 df_metrics.groupby('nome_produto', dropna=False)['valor_total'].sum().reset_index()
