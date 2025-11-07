@@ -277,6 +277,16 @@ except Exception as e:
 # ---- ANÁLISES E VISUALIZAÇÕES ----
 st.header("📈 Análises e Visualizações")
 
+# Seletor de gráficos na barra lateral
+chart_selection = st.sidebar.selectbox(
+    'Selecione o Gráfico para Visualizar',
+    (
+        'Faturamento por Categoria',
+        'Evolução Diária e Dias de Pico',
+        'Top 10 Produtos'
+    )
+)
+
 try:
     df_metrics = df_source.copy()
 
@@ -285,81 +295,84 @@ try:
         df_metrics['data_venda_dt'] = pd.to_datetime(df_metrics['data_venda'], format='%d/%m/%Y', errors='coerce')
 
     # 1) Faturamento por categoria e Faturamento médio por categoria
-    if 'categoria' in df_metrics.columns:
-        cat_rev = (
-            df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
-        )
-        cat_avg = (
-            df_metrics.groupby('categoria', dropna=False)['valor_total'].mean().reset_index()
-        )
-        st.subheader('Faturamento Médio (Barras) e Total (Pizza) por Categoria')
-        col_barras, col_pizza = st.columns(2)
-        with col_barras:
-            fig_cat_avg = px.bar(
-                cat_avg,
-                x='categoria', y='valor_total',
-                color='categoria',
-                color_discrete_sequence=px.colors.qualitative.Pastel,
-                title='Médio por Categoria (Barras)',
-                labels={'categoria': 'Categoria', 'valor_total': 'Médio (R$)'}
+    if chart_selection == 'Faturamento por Categoria':
+        if 'categoria' in df_metrics.columns:
+            cat_rev = (
+                df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
             )
-            fig_cat_avg.update_layout(showlegend=False, template='plotly_white')
-            fig_cat_avg.update_traces(marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
-            st.plotly_chart(fig_cat_avg, use_container_width=True)
-        with col_pizza:
-            fig_cat_pie = px.pie(
-                cat_rev,
-                names='categoria', values='valor_total',
-                title='Faturamento por Categoria (Pizza)'
+            cat_avg = (
+                df_metrics.groupby('categoria', dropna=False)['valor_total'].mean().reset_index()
             )
-            st.plotly_chart(fig_cat_pie, use_container_width=True)
+            st.subheader('Faturamento Médio (Barras) e Total (Pizza) por Categoria')
+            col_barras, col_pizza = st.columns(2)
+            with col_barras:
+                fig_cat_avg = px.bar(
+                    cat_avg,
+                    x='categoria', y='valor_total',
+                    color='categoria',
+                    color_discrete_sequence=px.colors.qualitative.Pastel,
+                    title='Médio por Categoria (Barras)',
+                    labels={'categoria': 'Categoria', 'valor_total': 'Médio (R$)'}
+                )
+                fig_cat_avg.update_layout(showlegend=False, template='plotly_white')
+                fig_cat_avg.update_traces(marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
+                st.plotly_chart(fig_cat_avg, use_container_width=True)
+            with col_pizza:
+                fig_cat_pie = px.pie(
+                    cat_rev,
+                    names='categoria', values='valor_total',
+                    title='Faturamento por Categoria (Pizza)'
+                )
+                st.plotly_chart(fig_cat_pie, use_container_width=True)
 
     # 2) Evolução diária (linha) e Dias de Pico (barras)
-    if 'data_venda_dt' in df_metrics.columns:
-        daily_rev = (
-            df_metrics.dropna(subset=['data_venda_dt'])
-            .groupby('data_venda_dt')['valor_total'].sum().reset_index()
-            .sort_values('data_venda_dt')
-        )
-        st.subheader('Evolução do Faturamento Diário e Dias de Pico')
-        col_line, col_peaks = st.columns(2)
-        with col_line:
-            fig_daily = px.line(
-                daily_rev,
-                x='data_venda_dt', y='valor_total',
-                markers=True,
-                title='Evolução do Faturamento Diário',
-                labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
+    if chart_selection == 'Evolução Diária e Dias de Pico':
+        if 'data_venda_dt' in df_metrics.columns:
+            daily_rev = (
+                df_metrics.dropna(subset=['data_venda_dt'])
+                .groupby('data_venda_dt')['valor_total'].sum().reset_index()
+                .sort_values('data_venda_dt')
             )
-            fig_daily.update_layout(template='plotly_white')
-            st.plotly_chart(fig_daily, use_container_width=True)
-        with col_peaks:
-            top_n = 10
-            peaks = (
-                daily_rev.sort_values('valor_total', ascending=False).head(top_n)
-            )
-            # Rótulo com o dia do pico (DD/MM)
-            if 'data_venda_dt' in peaks.columns:
-                try:
-                    peaks['dia_pico'] = peaks['data_venda_dt'].dt.strftime('%d/%m')
-                except Exception:
-                    peaks['dia_pico'] = ''
-            fig_peaks = px.bar(
-                peaks,
-                x='data_venda_dt', y='valor_total',
-                color='data_venda_dt',
-                text='dia_pico',
-                color_discrete_sequence=px.colors.qualitative.Pastel,
-                title=f'Dias de Pico de Faturamento (Top {top_n})',
-                labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
-            )
-            # Ajustar posição e estilo dos rótulos
-            fig_peaks.update_traces(textposition='outside',
-                                    marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
-            fig_peaks.update_layout(showlegend=False, template='plotly_white')
-            st.plotly_chart(fig_peaks, use_container_width=True)
+            st.subheader('Evolução do Faturamento Diário e Dias de Pico')
+            col_line, col_peaks = st.columns(2)
+            with col_line:
+                fig_daily = px.line(
+                    daily_rev,
+                    x='data_venda_dt', y='valor_total',
+                    markers=True,
+                    title='Evolução do Faturamento Diário',
+                    labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
+                )
+                fig_daily.update_layout(template='plotly_white')
+                st.plotly_chart(fig_daily, use_container_width=True)
+            with col_peaks:
+                top_n = 10
+                peaks = (
+                    daily_rev.sort_values('valor_total', ascending=False).head(top_n)
+                )
+                # Rótulo com o dia do pico (DD/MM)
+                if 'data_venda_dt' in peaks.columns:
+                    try:
+                        peaks['dia_pico'] = peaks['data_venda_dt'].dt.strftime('%d/%m')
+                    except Exception:
+                        peaks['dia_pico'] = ''
+                fig_peaks = px.bar(
+                    peaks,
+                    x='data_venda_dt', y='valor_total',
+                    color='data_venda_dt',
+                    text='dia_pico',
+                    color_discrete_sequence=px.colors.qualitative.Pastel,
+                    title=f'Dias de Pico de Faturamento (Top {top_n})',
+                    labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
+                )
+                # Ajustar posição e estilo dos rótulos
+                fig_peaks.update_traces(textposition='outside',
+                                        marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
+                fig_peaks.update_layout(showlegend=False, template='plotly_white')
+                st.plotly_chart(fig_peaks, use_container_width=True)
 
-        # 3) Top 10 Produtos Mais Lucrativos (barras) e Produtos com mais vendas (pizza)
+    # 3) Top 10 Produtos Mais Lucrativos (barras) e Produtos com mais vendas (pizza)
+    if chart_selection == 'Top 10 Produtos':
         if 'nome_produto' in df_metrics.columns:
             prod_profit = (
                 df_metrics.groupby('nome_produto', dropna=False)['valor_total'].sum().reset_index()
