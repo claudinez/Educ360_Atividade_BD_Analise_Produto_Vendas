@@ -213,23 +213,8 @@ try:
                 df_nulos_display = df_nulos_display[
                     df_nulos_display[col].astype(str).str.strip() != ""
                 ]
-
-    st.dataframe(
-        df_nulos_display[final_cols_nulos],
-        width='stretch',
-        column_config={
-            "id_venda": st.column_config.NumberColumn("ID", width="small"),
-            "nome_produto": st.column_config.TextColumn("Produto", width="medium"),
-            "categoria": st.column_config.TextColumn("Categoria", width="small"),
-            "quantidade": st.column_config.NumberColumn("Qtd", width="small"),
-            "preco_unitario": st.column_config.NumberColumn("Preço Unitário", format="R$ %.2f", width="small"),
-            "desconto": st.column_config.NumberColumn("Desconto", width="small"),
-            "data_venda": st.column_config.TextColumn("Data", width="small"),
-            "valor_total": st.column_config.NumberColumn("Valor Total", format="R$ %.2f", width="small"),
-        }
-    )
 except Exception as e:
-    st.error(f"Erro ao montar tabela com nulos tratados: {e}")
+    st.error(f"Erro ao processar nulos na Tabela Resumo: {e}")
 
 # ---- FILTROS ADICIONAIS ----
 st.sidebar.header('Filtros Adicionais')
@@ -262,109 +247,117 @@ if 'categoria' in df_filtered.columns and not df_filtered['categoria'].empty:
 # Atualizar df_source para os gráficos usarem o DataFrame filtrado
 df_source = df_filtered.copy()
 
-# Botão de exportar para CSV
-if not df_filtered.empty:
-    csv = df_filtered.to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(
-        label="Exportar Dados Filtrados para CSV",
-        data=csv,
-        file_name="dados_filtrados.csv",
-        mime="text/csv",
-    )
+try:
+    # Botão de exportar para CSV
+    if not df_filtered.empty:
+        csv = df_filtered.to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button(
+            label="Exportar Dados Filtrados para CSV",
+            data=csv,
+            file_name="dados_filtrados.csv",
+            mime="text/csv",
+        )
+        st.dataframe(
+            df_filtered[final_cols_nulos],
+            width='stretch',
+            column_config={
+                "id_venda": st.column_config.NumberColumn("ID", width="small"),
+                "nome_produto": st.column_config.TextColumn("Produto", width="medium"),
+                "categoria": st.column_config.TextColumn("Categoria", width="small"),
+                "quantidade": st.column_config.NumberColumn("Qtd", width="small"),
+                "preco_unitario": st.column_config.NumberColumn("Preço Unitário", format="R$ %.2f", width="small"),
+                "desconto": st.column_config.NumberColumn("Desconto", width="small"),
+                "data_venda": st.column_config.TextColumn("Data", width="small"),
+                "valor_total": st.column_config.NumberColumn("Valor Total", format="R$ %.2f", width="small"),
+            }
+        )
+except Exception as e:
+    st.error(f"Erro ao montar tabela com nulos tratados: {e}")
 
 # ---- ANÁLISES E VISUALIZAÇÕES ----
 st.header("📈 Análises e Visualizações")
 
 try:
-    # Usar a tabela exibida (com filtro de vazios) como fonte para os gráficos
-    df_source = (
-        df_nulos_display if 'df_nulos_display' in locals() else (
-            df_nulos if 'df_nulos' in locals() else df
+    df_metrics = df_source.copy()
+
+    # Converter data para datetime para gráficos temporais
+    if 'data_venda' in df_metrics.columns:
+        df_metrics['data_venda_dt'] = pd.to_datetime(df_metrics['data_venda'], format='%d/%m/%Y', errors='coerce')
+
+    # 1) Faturamento por categoria e Faturamento médio por categoria
+    if 'categoria' in df_metrics.columns:
+        cat_rev = (
+            df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
         )
-    )
-    if 'valor_total' not in df_source.columns:
-        st.warning("Resumo vazio ou sem 'valor_total'. Verifique dados de produtos e vendas.")
-    else:
-        df_metrics = df_source.copy()
-
-        # Converter data para datetime para gráficos temporais
-        if 'data_venda' in df_metrics.columns:
-            df_metrics['data_venda_dt'] = pd.to_datetime(df_metrics['data_venda'], format='%d/%m/%Y', errors='coerce')
-
-        # 1) Faturamento por categoria e Faturamento médio por categoria
-        if 'categoria' in df_metrics.columns:
-            cat_rev = (
-                df_metrics.groupby('categoria', dropna=False)['valor_total'].sum().reset_index()
+        cat_avg = (
+            df_metrics.groupby('categoria', dropna=False)['valor_total'].mean().reset_index()
+        )
+        st.subheader('Faturamento Médio (Barras) e Total (Pizza) por Categoria')
+        col_barras, col_pizza = st.columns(2)
+        with col_barras:
+            fig_cat_avg = px.bar(
+                cat_avg,
+                x='categoria', y='valor_total',
+                color='categoria',
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                title='Médio por Categoria (Barras)',
+                labels={'categoria': 'Categoria', 'valor_total': 'Médio (R$)'}
             )
-            cat_avg = (
-                df_metrics.groupby('categoria', dropna=False)['valor_total'].mean().reset_index()
+            fig_cat_avg.update_layout(showlegend=False, template='plotly_white')
+            fig_cat_avg.update_traces(marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
+            st.plotly_chart(fig_cat_avg, use_container_width=True)
+        with col_pizza:
+            fig_cat_pie = px.pie(
+                cat_rev,
+                names='categoria', values='valor_total',
+                title='Faturamento por Categoria (Pizza)'
             )
-            st.subheader('Faturamento Médio (Barras) e Total (Pizza) por Categoria')
-            col_barras, col_pizza = st.columns(2)
-            with col_barras:
-                fig_cat_avg = px.bar(
-                    cat_avg,
-                    x='categoria', y='valor_total',
-                    color='categoria',
-                    color_discrete_sequence=px.colors.qualitative.Pastel,
-                    title='Médio por Categoria (Barras)',
-                    labels={'categoria': 'Categoria', 'valor_total': 'Médio (R$)'}
-                )
-                fig_cat_avg.update_layout(showlegend=False, template='plotly_white')
-                fig_cat_avg.update_traces(marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
-                st.plotly_chart(fig_cat_avg, use_container_width=True)
-            with col_pizza:
-                fig_cat_pie = px.pie(
-                    cat_rev,
-                    names='categoria', values='valor_total',
-                    title='Faturamento por Categoria (Pizza)'
-                )
-                st.plotly_chart(fig_cat_pie, use_container_width=True)
+            st.plotly_chart(fig_cat_pie, use_container_width=True)
 
-        # 2) Evolução diária (linha) e Dias de Pico (barras)
-        if 'data_venda_dt' in df_metrics.columns:
-            daily_rev = (
-                df_metrics.dropna(subset=['data_venda_dt'])
-                .groupby('data_venda_dt')['valor_total'].sum().reset_index()
-                .sort_values('data_venda_dt')
+    # 2) Evolução diária (linha) e Dias de Pico (barras)
+    if 'data_venda_dt' in df_metrics.columns:
+        daily_rev = (
+            df_metrics.dropna(subset=['data_venda_dt'])
+            .groupby('data_venda_dt')['valor_total'].sum().reset_index()
+            .sort_values('data_venda_dt')
+        )
+        st.subheader('Evolução do Faturamento Diário e Dias de Pico')
+        col_line, col_peaks = st.columns(2)
+        with col_line:
+            fig_daily = px.line(
+                daily_rev,
+                x='data_venda_dt', y='valor_total',
+                markers=True,
+                title='Evolução do Faturamento Diário',
+                labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
             )
-            st.subheader('Evolução do Faturamento Diário e Dias de Pico')
-            col_line, col_peaks = st.columns(2)
-            with col_line:
-                fig_daily = px.line(
-                    daily_rev,
-                    x='data_venda_dt', y='valor_total',
-                    markers=True,
-                    title='Evolução do Faturamento Diário',
-                    labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
-                )
-                fig_daily.update_layout(template='plotly_white')
-                st.plotly_chart(fig_daily, use_container_width=True)
-            with col_peaks:
-                top_n = 10
-                peaks = (
-                    daily_rev.sort_values('valor_total', ascending=False).head(top_n)
-                )
-                # Rótulo com o dia do pico (DD/MM)
-                if 'data_venda_dt' in peaks.columns:
-                    try:
-                        peaks['dia_pico'] = peaks['data_venda_dt'].dt.strftime('%d/%m')
-                    except Exception:
-                        peaks['dia_pico'] = ''
-                fig_peaks = px.bar(
-                    peaks,
-                    x='data_venda_dt', y='valor_total',
-                    color='data_venda_dt',
-                    text='dia_pico',
-                    color_discrete_sequence=px.colors.qualitative.Pastel,
-                    title=f'Dias de Pico de Faturamento (Top {top_n})',
-                    labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
-                )
-                # Ajustar posição e estilo dos rótulos
-                fig_peaks.update_traces(textposition='outside',
-                                        marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
-                fig_peaks.update_layout(showlegend=False, template='plotly_white')
-                st.plotly_chart(fig_peaks, use_container_width=True)
+            fig_daily.update_layout(template='plotly_white')
+            st.plotly_chart(fig_daily, use_container_width=True)
+        with col_peaks:
+            top_n = 10
+            peaks = (
+                daily_rev.sort_values('valor_total', ascending=False).head(top_n)
+            )
+            # Rótulo com o dia do pico (DD/MM)
+            if 'data_venda_dt' in peaks.columns:
+                try:
+                    peaks['dia_pico'] = peaks['data_venda_dt'].dt.strftime('%d/%m')
+                except Exception:
+                    peaks['dia_pico'] = ''
+            fig_peaks = px.bar(
+                peaks,
+                x='data_venda_dt', y='valor_total',
+                color='data_venda_dt',
+                text='dia_pico',
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                title=f'Dias de Pico de Faturamento (Top {top_n})',
+                labels={'data_venda_dt': 'Data', 'valor_total': 'Faturamento (R$)'}
+            )
+            # Ajustar posição e estilo dos rótulos
+            fig_peaks.update_traces(textposition='outside',
+                                    marker_line_color='rgba(0,0,0,0.15)', marker_line_width=1, opacity=0.9)
+            fig_peaks.update_layout(showlegend=False, template='plotly_white')
+            st.plotly_chart(fig_peaks, use_container_width=True)
 
         # 3) Top 10 Produtos Mais Lucrativos (barras) e Produtos com mais vendas (pizza)
         if 'nome_produto' in df_metrics.columns:
